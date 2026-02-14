@@ -1,0 +1,181 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Models
+model User {
+  id                   String      @id @default(uuid())
+  email                String      @unique
+  password_hash        String
+  nome                 String
+  telefone             String
+  foto_url             String?
+  role                 String      @default("VENDEDOR") // ADMIN, GERENTE, VENDEDOR
+  nivel                String?     // JUNIOR, PLENO, SENIOR
+  status               String      @default("ATIVO") // ATIVO, FERIAS, INATIVO
+  especialidades       String      // Stores as comma separated string or JSON
+  meta_mensal_unidades Int         @default(10)
+  meta_mensal_valor    Float       @default(500000)
+  capacidade_max_leads Int         @default(15)
+  regras_atribuicao    String?     // JSON string
+  created_at           DateTime    @default(now())
+  updated_at           DateTime    @updatedAt
+  leads_atribuidos     Lead[]
+  negociacoes          Negociacao[]
+  atividades           Atividade[]
+}
+
+model Lead {
+  id                  String         @id @default(uuid())
+  nome                String
+  email               String
+  whatsapp            String
+  tipo_negociacao     String         // AVISTA, PARCELADO, ENTRADA_PARCELAS
+  valor_entrada       Float?
+  prazo_meses         Int?
+  mensagem            String?
+  preferencia_contato String         // JSON or CSV: ["EMAIL", "WHATSAPP"]
+  ip_origem           String?
+  user_agent          String?
+  utm_source          String?
+  utm_medium          String?
+  utm_campaign        String?
+  status              String         @default("NOVO")
+  veiculo_id          String
+  veiculo             Veiculo        @relation(fields: [veiculo_id], references: [id])
+  vendedor_id         String?
+  vendedor            User?          @relation(fields: [vendedor_id], references: [id])
+  atribuicao_tipo     String         @default("SISTEMA")
+  negociacao          Negociacao?
+  atividades          Atividade[]
+  created_at          DateTime       @default(now())
+  updated_at          DateTime       @updatedAt
+
+  @@index([status])
+  @@index([vendedor_id])
+  @@index([created_at])
+}
+
+model Veiculo {
+  id                   String           @id @default(uuid())
+  codigo_interno       String           @unique
+  slug                 String           @unique
+  status               String           @default("DISPONIVEL")
+  destaque             Boolean          @default(false)
+  categoria            String           // SUV, SEDAN...
+  marca                String
+  modelo               String
+  versao               String
+  ano_fabricacao       Int
+  ano_modelo           Int
+  cor                  String
+  motor                String
+  combustivel          String
+  transmissao          String
+  tracao               String
+  portas               Int
+  lugares              Int
+  quilometragem        Int
+  preco_venda          Float
+  preco_custo          Float
+  preco_minimo         Float?
+  video_url            String?
+  descricao            String
+  opcionais            String           // JSON or CSV
+  data_aquisicao       DateTime
+  data_venda           DateTime?
+  observacoes_internas String?
+  fotos                Foto[]
+  leads                Lead[]
+  negociacoes          Negociacao[]
+  created_at           DateTime         @default(now())
+  updated_at           DateTime         @updatedAt
+
+  @@index([status])
+  @@index([categoria])
+  @@index([preco_venda])
+}
+
+model Foto {
+  id         String   @id @default(uuid())
+  url        String
+  ordem      Int      @default(0)
+  veiculo_id String
+  veiculo    Veiculo  @relation(fields: [veiculo_id], references: [id], onDelete: Cascade)
+  created_at DateTime @default(now())
+}
+
+model Negociacao {
+  id             String           @id @default(uuid())
+  status         String           @default("PROSPECCAO")
+  valor_proposta Float?
+  valor_entrada  Float?
+  parcelas       Int?
+  valor_parcela  Float?
+  lead_id        String           @unique
+  lead           Lead             @relation(fields: [lead_id], references: [id])
+  veiculo_id     String
+  veiculo        Veiculo          @relation(fields: [veiculo_id], references: [id])
+  vendedor_id    String
+  vendedor       User             @relation(fields: [vendedor_id], references: [id])
+  propostas      Proposta[]
+  atividades     Atividade[]
+  documentos     Documento[]
+  created_at     DateTime         @default(now())
+  updated_at     DateTime         @updatedAt
+
+  @@index([status])
+  @@index([vendedor_id])
+}
+
+model Proposta {
+  id            String     @id @default(uuid())
+  negociacao_id String
+  negociacao    Negociacao @relation(fields: [negociacao_id], references: [id], onDelete: Cascade)
+  valor         Float
+  valor_entrada Float?
+  parcelas      Int?
+  valor_parcela Float?
+  validade      DateTime?
+  data          DateTime   @default(now())
+  status        String     // ACEITA, REJEITADA, CONTRA_PROPOSTA
+  observacoes   String?
+}
+
+model Atividade {
+  id            String      @id @default(uuid())
+  tipo          String      // LIGACAO, WHATSAPP, EMAIL, VISITA, NOTA
+  descricao     String
+  data          DateTime    @default(now())
+  user_id       String
+  user          User        @relation(fields: [user_id], references: [id])
+  lead_id       String?
+  lead          Lead?       @relation(fields: [lead_id], references: [id])
+  negociacao_id String?
+  negociacao    Negociacao? @relation(fields: [negociacao_id], references: [id])
+}
+
+model Documento {
+  id            String     @id @default(uuid())
+  nome          String
+  url           String
+  tipo          String     // CNH, COMPROVANTE, ETC
+  negociacao_id String
+  negociacao    Negociacao @relation(fields: [negociacao_id], references: [id], onDelete: Cascade)
+  created_at    DateTime   @default(now())
+}
+
+model Configuracao {
+  chave       String   @id
+  valor       String
+  descricao   String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("configuracoes")
+}
